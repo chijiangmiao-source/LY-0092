@@ -14,6 +14,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 from app.dao.review_dao import ReviewDAO
+from app.utils.signal_bus import SignalBus
 
 plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS']
 plt.rcParams['axes.unicode_minus'] = False
@@ -24,6 +25,8 @@ class StatisticsPage(QWidget):
         super().__init__(parent)
         self.setObjectName("statisticsPage")
         self.dao = ReviewDAO()
+        self.signalBus = SignalBus()
+        self.signalBus.dataChanged.connect(self.refresh)
         self.initUI()
         self.refresh()
 
@@ -34,7 +37,7 @@ class StatisticsPage(QWidget):
 
         headerLayout = QHBoxLayout()
         title = QLabel("统计分析")
-        title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        title.setStyleSheet("font-size: 20px; font-weight: bold; color: #1a1a1a;")
         headerLayout.addWidget(title)
         headerLayout.addStretch()
 

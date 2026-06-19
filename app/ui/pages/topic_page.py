@@ -12,6 +12,7 @@ from qfluentwidgets import (
 
 from app.dao.topic_dao import TopicDAO
 from app.models.models import SpecialTopic
+from app.utils.signal_bus import SignalBus
 
 
 class TopicPage(QWidget):
@@ -19,6 +20,8 @@ class TopicPage(QWidget):
         super().__init__(parent)
         self.setObjectName("topicPage")
         self.dao = TopicDAO()
+        self.signalBus = SignalBus()
+        self.signalBus.dataChanged.connect(self.refresh)
         self.initUI()
         self.refresh()
 
@@ -29,7 +32,7 @@ class TopicPage(QWidget):
 
         headerLayout = QHBoxLayout()
         title = QLabel("重点整改专题")
-        title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        title.setStyleSheet("font-size: 20px; font-weight: bold; color: #1a1a1a;")
         headerLayout.addWidget(title)
         headerLayout.addStretch()
 

@@ -1,4 +1,5 @@
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QRegularExpression
+from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QHeaderView, QMessageBox, QLabel, QAbstractItemView
@@ -11,6 +12,7 @@ from qfluentwidgets import (
 from app.dao.review_dao import ReviewDAO
 from app.models.models import BadReview
 from app.ui.dialogs.review_dialog import ReviewDialog
+from app.utils.signal_bus import SignalBus
 from app.utils.constants import PROBLEM_TYPES, REVIEW_SOURCES, RECTIFICATION_STATUSES
 
 
@@ -19,6 +21,7 @@ class ReviewListPage(QWidget):
         super().__init__(parent)
         self.setObjectName("reviewListPage")
         self.dao = ReviewDAO()
+        self.signalBus = SignalBus()
         self.initUI()
         self.refresh()
 
@@ -31,7 +34,7 @@ class ReviewListPage(QWidget):
         headerLayout.setSpacing(10)
 
         title = QLabel("差评记录管理")
-        title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        title.setStyleSheet("font-size: 20px; font-weight: bold; color: #1a1a1a;")
         headerLayout.addWidget(title)
         headerLayout.addStretch()
 
@@ -79,6 +82,8 @@ class ReviewListPage(QWidget):
         self.roomFilter = LineEdit()
         self.roomFilter.setPlaceholderText("输入房间号")
         self.roomFilter.setFixedWidth(120)
+        room_regex = QRegularExpression(r'^[A-Za-z0-9\-]{0,10}$')
+        self.roomFilter.setValidator(QRegularExpressionValidator(room_regex, self))
         self.roomFilter.textChanged.connect(self.onFilter)
         filterLayout.addWidget(self.roomFilter)
 
@@ -225,6 +230,7 @@ class ReviewListPage(QWidget):
                     parent=self
                 )
                 self.loadData()
+                self.signalBus.notifyChanged()
             else:
                 QMessageBox.warning(self, "保存失败", "\n".join(validation.errors))
 
@@ -243,6 +249,7 @@ class ReviewListPage(QWidget):
                     parent=self
                 )
                 self.loadData()
+                self.signalBus.notifyChanged()
             else:
                 QMessageBox.warning(self, "更新失败", "\n".join(validation.errors))
 
@@ -265,3 +272,4 @@ class ReviewListPage(QWidget):
                 parent=self
             )
             self.loadData()
+            self.signalBus.notifyChanged()

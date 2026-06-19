@@ -1,4 +1,5 @@
-from PySide6.QtCore import Qt, QDate
+from PySide6.QtCore import Qt, QDate, QRegularExpression
+from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLineEdit, QDateEdit, QComboBox, QTextEdit, QCheckBox,
@@ -55,7 +56,9 @@ class ReviewDialog(QDialog):
         formLayout.addRow("入住日期：", self.stayDateEdit)
 
         self.roomNoEdit = LineEdit()
-        self.roomNoEdit.setPlaceholderText("请输入房间编号，如：101、203")
+        self.roomNoEdit.setPlaceholderText("请输入房间编号，如：101、203A、B102")
+        room_regex = QRegularExpression(r'^[A-Za-z0-9\-]{1,10}$')
+        self.roomNoEdit.setValidator(QRegularExpressionValidator(room_regex, self))
         formLayout.addRow("房间编号：", self.roomNoEdit)
 
         self.sourceCombo = ComboBox()

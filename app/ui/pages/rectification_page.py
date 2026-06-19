@@ -13,6 +13,7 @@ from qfluentwidgets import (
 from app.dao.review_dao import ReviewDAO
 from app.models.models import BadReview
 from app.ui.dialogs.review_dialog import ReviewDialog
+from app.utils.signal_bus import SignalBus
 
 
 class RectificationPage(QWidget):
@@ -20,6 +21,8 @@ class RectificationPage(QWidget):
         super().__init__(parent)
         self.setObjectName("rectificationPage")
         self.dao = ReviewDAO()
+        self.signalBus = SignalBus()
+        self.signalBus.dataChanged.connect(self.refresh)
         self.initUI()
         self.refresh()
 
@@ -30,7 +33,7 @@ class RectificationPage(QWidget):
 
         headerLayout = QHBoxLayout()
         title = QLabel("整改任务维护")
-        title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        title.setStyleSheet("font-size: 20px; font-weight: bold; color: #1a1a1a;")
         headerLayout.addWidget(title)
         headerLayout.addStretch()
 
@@ -282,6 +285,7 @@ class RectificationPage(QWidget):
                 parent=self
             )
             self.refresh()
+            self.signalBus.notifyChanged()
         else:
             QMessageBox.warning(self, "操作失败", "\n".join(validation.errors))
 
@@ -313,6 +317,7 @@ class RectificationPage(QWidget):
                     parent=self
                 )
                 self.refresh()
+                self.signalBus.notifyChanged()
             else:
                 QMessageBox.warning(self, "操作失败", "\n".join(validation.errors))
 
@@ -336,6 +341,7 @@ class RectificationPage(QWidget):
                     parent=self
                 )
                 self.refresh()
+                self.signalBus.notifyChanged()
             else:
                 QMessageBox.warning(self, "更新失败", "\n".join(validation.errors))
 
