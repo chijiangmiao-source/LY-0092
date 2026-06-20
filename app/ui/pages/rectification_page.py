@@ -1,19 +1,58 @@
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QHeaderView, QMessageBox, QLabel, QAbstractItemView, QSplitter,
-    QTextEdit
+    QTextEdit, QDialog, QListWidget, QListWidgetItem, QInputDialog,
+    QLineEdit
 )
 from qfluentwidgets import (
-    PushButton, PrimaryPushButton,
+    PushButton, PrimaryPushButton, ComboBox,
     InfoBar, InfoBarPosition, FluentIcon as FIF,
-    TabWidget, SubtitleLabel, StrongBodyLabel, BodyLabel
+    TabWidget, SubtitleLabel, StrongBodyLabel, BodyLabel,
+    CardWidget
 )
 
 from app.dao.review_dao import ReviewDAO
-from app.models.models import BadReview
+from app.dao.warning_dao import WarningDAO
+from app.models.models import BadReview, Warning
 from app.ui.dialogs.review_dialog import ReviewDialog
 from app.utils.signal_bus import SignalBus
+from app.utils.constants import WARNING_TYPES, WARNING_TYPE_COLORS
+
+
+class WarningDetailDialog(QDialog):
+    def __init__(self, warnings, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("预警详情")
+        self.resize(500, 400)
+        self.warnings = warnings
+        self.initUI()
+
+    def initUI(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
+
+        title = StrongBodyLabel("预警原因")
+        title.setStyleSheet("font-size: 16px; font-weight: bold;")
+        layout.addWidget(title)
+
+        warningList = QListWidget()
+        for w in self.warnings:
+            item = QListWidgetItem()
+            item.setText(f"[{w.warning_type}]\n{w.warning_reason}\n检测时间: {w.detected_at}")
+            color = WARNING_TYPE_COLORS.get(w.warning_type, "#333")
+            item.setForeground(QColor(color))
+            warningList.addItem(item)
+        layout.addWidget(warningList, 1)
+
+        btnLayout = QHBoxLayout()
+        btnLayout.addStretch()
+        closeBtn = PushButton("关闭")
+        closeBtn.clicked.connect(self.accept)
+        btnLayout.addWidget(closeBtn)
+        layout.addLayout(btnLayout)
 
 
 class RectificationPage(QWidget):
@@ -21,8 +60,10 @@ class RectificationPage(QWidget):
         super().__init__(parent)
         self.setObjectName("rectificationPage")
         self.dao = ReviewDAO()
+        self.warning_dao = WarningDAO()
         self.signalBus = SignalBus()
         self.signalBus.dataChanged.connect(self.refresh)
+        self.current_warning_filter = ""
         self.initUI()
         self.refresh()
 
@@ -36,6 +77,15 @@ class RectificationPage(QWidget):
         title.setStyleSheet("font-size: 20px; font-weight: bold; color: #1a1a1a;")
         headerLayout.addWidget(title)
         headerLayout.addStretch()
+
+        headerLayout.addWidget(BodyLabel("预警筛选："))
+        self.warningFilterCombo = ComboBox()
+        self.warningFilterCombo.addItem("全部", "")
+        for wt in WARNING_TYPES:
+            self.warningFilterCombo.addItem(wt, wt)
+        self.warningFilterCombo.currentIndexChanged.connect(self.onWarningFilterChanged)
+        self.warningFilterCombo.setFixedWidth(160)
+        headerLayout.addWidget(self.warningFilterCombo)
 
         self.refreshBtn = PushButton("刷新")
         self.refreshBtn.setIcon(FIF.SYNC)
@@ -57,6 +107,21 @@ class RectificationPage(QWidget):
         statsLayout.addStretch()
 
         layout.addLayout(statsLayout)
+
+        warningStatsLayout = QHBoxLayout()
+        warningStatsLayout.setSpacing(15)
+
+        warning_stats = self.warning_dao.get_statistics()
+        self.overdueCard = self.createWarningCard("超期未整改", str(warning_stats.get("超期未整改", 0)), "#e74c3c")
+        self.longTermCard = self.createWarningCard("长期整改中", str(warning_stats.get("长期整改中", 0)), "#f39c12")
+        self.noReviewCard = self.createWarningCard("已完成但未复查", str(warning_stats.get("已完成但未复查", 0)), "#9b59b6")
+
+        warningStatsLayout.addWidget(self.overdueCard)
+        warningStatsLayout.addWidget(self.longTermCard)
+        warningStatsLayout.addWidget(self.noReviewCard)
+        warningStatsLayout.addStretch()
+
+        layout.addLayout(warningStatsLayout)
 
         self.tabWidget = TabWidget(self)
 
@@ -93,6 +158,30 @@ class RectificationPage(QWidget):
 
         return card
 
+    def createWarningCard(self, title, value, color):
+        card = CardWidget()
+        card.setStyleSheet(f"""
+            CardWidget {{
+                background-color: {color}15;
+                border: 1px solid {color}40;
+                border-radius: 8px;
+            }}
+        """)
+        cardLayout = QVBoxLayout(card)
+        cardLayout.setContentsMargins(15, 10, 15, 10)
+        cardLayout.setSpacing(3)
+
+        titleLabel = BodyLabel(f"⚠ {title}")
+        titleLabel.setStyleSheet(f"color: {color}; font-size: 13px; font-weight: bold;")
+
+        valueLabel = SubtitleLabel(value)
+        valueLabel.setStyleSheet(f"color: {color}; font-size: 24px; font-weight: bold;")
+
+        cardLayout.addWidget(titleLabel)
+        cardLayout.addWidget(valueLabel)
+
+        return card
+
     def createTaskPage(self, task_type):
         page = QWidget()
         pageLayout = QVBoxLayout(page)
@@ -117,7 +206,7 @@ class RectificationPage(QWidget):
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
 
-        headers = ["记录编号", "入住日期", "房间号", "问题类型", "差评摘要", "责任归因"]
+        headers = ["记录编号", "入住日期", "房间号", "问题类型", "差评摘要", "责任归因", "预警"]
         table.setColumnCount(len(headers))
         table.setHorizontalHeaderLabels(headers)
 
@@ -128,6 +217,7 @@ class RectificationPage(QWidget):
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.Stretch)
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(6, QHeaderView.ResizeToContents)
 
         detailPanel = QWidget()
         detailLayout = QVBoxLayout(detailPanel)
@@ -159,6 +249,27 @@ class RectificationPage(QWidget):
         self.responsibilityDetail = BodyLabel("-")
         self.responsibilityDetail.setWordWrap(True)
         detailLayout.addWidget(self.responsibilityDetail)
+
+        detailLayout.addWidget(StrongBodyLabel("预警信息："))
+        self.warningDetail = BodyLabel("无预警")
+        self.warningDetail.setWordWrap(True)
+        self.warningDetail.setStyleSheet("color: #666;")
+        detailLayout.addWidget(self.warningDetail)
+
+        warningBtnLayout = QHBoxLayout()
+        self.viewWarningBtn = PushButton("查看预警原因")
+        self.viewWarningBtn.setIcon(FIF.INFO)
+        self.viewWarningBtn.clicked.connect(self.viewWarningReason)
+        self.viewWarningBtn.setEnabled(False)
+        warningBtnLayout.addWidget(self.viewWarningBtn)
+
+        self.dismissWarningBtn = PushButton("消除提醒")
+        self.dismissWarningBtn.setIcon(FIF.ACCEPT)
+        self.dismissWarningBtn.clicked.connect(self.dismissWarning)
+        self.dismissWarningBtn.setEnabled(False)
+        warningBtnLayout.addWidget(self.dismissWarningBtn)
+        warningBtnLayout.addStretch()
+        detailLayout.addLayout(warningBtnLayout)
 
         detailLayout.addWidget(StrongBodyLabel("整改措施："))
         self.measureDetail = QTextEdit()
@@ -217,6 +328,10 @@ class RectificationPage(QWidget):
         }
         return labels.get(field, field)
 
+    def onWarningFilterChanged(self, index):
+        self.current_warning_filter = self.warningFilterCombo.currentData()
+        self.refresh()
+
     def onTabChanged(self, index):
         if index == 0:
             self.pendingTable.clearSelection()
@@ -245,12 +360,34 @@ class RectificationPage(QWidget):
         self.responsibilityDetail.setText(review.responsibility)
         self.measureDetail.setPlainText(review.rectification_measure)
 
+        warnings = self.warning_dao.get_by_review_id(review.id)
+        if warnings:
+            warning_types = ", ".join([w.warning_type for w in warnings])
+            colors = [WARNING_TYPE_COLORS.get(w.warning_type, "#333") for w in warnings]
+            color = colors[0] if colors else "#333"
+            self.warningDetail.setText(f"⚠ {warning_types}")
+            self.warningDetail.setStyleSheet(f"color: {color}; font-weight: bold;")
+            self.viewWarningBtn.setEnabled(True)
+            self.dismissWarningBtn.setEnabled(True)
+            self.current_warnings = warnings
+        else:
+            self.warningDetail.setText("无预警")
+            self.warningDetail.setStyleSheet("color: #666;")
+            self.viewWarningBtn.setEnabled(False)
+            self.dismissWarningBtn.setEnabled(False)
+            self.current_warnings = []
+
     def clearDetail(self):
         for label in self.detailLabels.values():
             label.setText("-")
         self.summaryDetail.clear()
         self.responsibilityDetail.setText("-")
         self.measureDetail.clear()
+        self.warningDetail.setText("无预警")
+        self.warningDetail.setStyleSheet("color: #666;")
+        self.viewWarningBtn.setEnabled(False)
+        self.dismissWarningBtn.setEnabled(False)
+        self.current_warnings = []
 
     def getCurrentReview(self, task_type):
         table = self.pendingTable if task_type == "pending" else self.inProgressTable
@@ -258,6 +395,38 @@ class RectificationPage(QWidget):
         if current_row < 0:
             return None
         return table.item(current_row, 0).data(Qt.UserRole)
+
+    def viewWarningReason(self):
+        if not hasattr(self, 'current_warnings') or not self.current_warnings:
+            return
+        dialog = WarningDetailDialog(self.current_warnings, self)
+        dialog.exec()
+
+    def dismissWarning(self):
+        if not hasattr(self, 'current_warnings') or not self.current_warnings:
+            return
+
+        reason, ok = QInputDialog.getText(
+            self, "消除提醒", "请输入消除原因（可选）：",
+            echo=QLineEdit.Normal if hasattr(QLineEdit, 'Normal') else 0
+        )
+
+        if ok:
+            task_type = "pending" if self.tabWidget.currentIndex() == 0 else "in_progress"
+            review = self.getCurrentReview(task_type)
+            if review:
+                self.warning_dao.dismiss_all_for_review(review.id, reason)
+                InfoBar.success(
+                    title="操作成功",
+                    content="预警提醒已消除",
+                    orient=Qt.Horizontal,
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=3000,
+                    parent=self
+                )
+                self.refresh()
+                self.signalBus.notifyChanged()
 
     def updateStatus(self, task_type, new_status):
         review = self.getCurrentReview(task_type)
@@ -349,8 +518,17 @@ class RectificationPage(QWidget):
         pending = self.dao.get_pending_tasks()
         in_progress = self.dao.get_in_progress_tasks()
 
+        if self.current_warning_filter:
+            all_warnings = self.warning_dao.get_all(warning_type=self.current_warning_filter)
+            warning_review_ids = {w.review_id for w in all_warnings}
+            pending = [r for r in pending if r.id in warning_review_ids]
+            in_progress = [r for r in in_progress if r.id in warning_review_ids]
+
         self.updateStatCards(len(pending), len(in_progress),
                              self.dao.get_statistics()["completed"])
+
+        warning_stats = self.warning_dao.get_statistics()
+        self.updateWarningCards(warning_stats)
 
         self.loadTableData(self.pendingTable, pending)
         self.loadTableData(self.inProgressTable, in_progress)
@@ -362,8 +540,16 @@ class RectificationPage(QWidget):
         self.inProgressCard.findChild(SubtitleLabel).setText(str(in_progress))
         self.completedCard.findChild(SubtitleLabel).setText(str(completed))
 
+    def updateWarningCards(self, warning_stats):
+        self.overdueCard.findChild(SubtitleLabel).setText(str(warning_stats.get("超期未整改", 0)))
+        self.longTermCard.findChild(SubtitleLabel).setText(str(warning_stats.get("长期整改中", 0)))
+        self.noReviewCard.findChild(SubtitleLabel).setText(str(warning_stats.get("已完成但未复查", 0)))
+
     def loadTableData(self, table, reviews):
         table.setRowCount(0)
+        review_ids = [r.id for r in reviews]
+        warnings_by_review = self.warning_dao.get_active_warnings_for_reviews(review_ids)
+
         for review in reviews:
             row = table.rowCount()
             table.insertRow(row)
@@ -377,3 +563,13 @@ class RectificationPage(QWidget):
             table.setItem(row, 3, QTableWidgetItem(review.problem_type))
             table.setItem(row, 4, QTableWidgetItem(review.summary))
             table.setItem(row, 5, QTableWidgetItem(review.responsibility))
+
+            warnings = warnings_by_review.get(review.id, [])
+            if warnings:
+                warning_types = "、".join([w.warning_type for w in warnings])
+                warning_item = QTableWidgetItem(f"⚠ {warning_types}")
+                color = WARNING_TYPE_COLORS.get(warnings[0].warning_type, "#e74c3c")
+                warning_item.setForeground(QColor(color))
+                table.setItem(row, 6, warning_item)
+            else:
+                table.setItem(row, 6, QTableWidgetItem(""))

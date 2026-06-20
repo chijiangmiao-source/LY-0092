@@ -1,4 +1,5 @@
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGridLayout
 )
@@ -14,7 +15,9 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 from app.dao.review_dao import ReviewDAO
+from app.dao.warning_dao import WarningDAO
 from app.utils.signal_bus import SignalBus
+from app.utils.constants import WARNING_TYPES, WARNING_TYPE_COLORS
 
 plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS']
 plt.rcParams['axes.unicode_minus'] = False
@@ -25,6 +28,7 @@ class StatisticsPage(QWidget):
         super().__init__(parent)
         self.setObjectName("statisticsPage")
         self.dao = ReviewDAO()
+        self.warning_dao = WarningDAO()
         self.signalBus = SignalBus()
         self.signalBus.dataChanged.connect(self.refresh)
         self.initUI()
@@ -65,6 +69,24 @@ class StatisticsPage(QWidget):
 
         layout.addLayout(statsGrid)
 
+        warningTitle = StrongBodyLabel("⚠ 预警统计")
+        warningTitle.setStyleSheet("font-size: 16px; font-weight: bold; margin-top: 10px;")
+        layout.addWidget(warningTitle)
+
+        warningStatsLayout = QHBoxLayout()
+        warningStatsLayout.setSpacing(15)
+
+        self.overdueCard = self.createWarningCard("超期未整改", "0", "#e74c3c")
+        self.longTermCard = self.createWarningCard("长期整改中", "0", "#f39c12")
+        self.noReviewCard = self.createWarningCard("已完成但未复查", "0", "#9b59b6")
+
+        warningStatsLayout.addWidget(self.overdueCard)
+        warningStatsLayout.addWidget(self.longTermCard)
+        warningStatsLayout.addWidget(self.noReviewCard)
+        warningStatsLayout.addStretch()
+
+        layout.addLayout(warningStatsLayout)
+
         chartLayout = QGridLayout()
         chartLayout.setSpacing(15)
 
@@ -72,11 +94,13 @@ class StatisticsPage(QWidget):
         self.sourceChart = self.createChartCard("差评来源分布")
         self.statusChart = self.createChartCard("整改状态分布")
         self.trendChart = self.createChartCard("近12个月差评趋势")
+        self.warningChart = self.createChartCard("预警类型分布")
 
         chartLayout.addWidget(self.problemTypeChart['card'], 0, 0)
         chartLayout.addWidget(self.sourceChart['card'], 0, 1)
         chartLayout.addWidget(self.statusChart['card'], 1, 0)
-        chartLayout.addWidget(self.trendChart['card'], 1, 1)
+        chartLayout.addWidget(self.warningChart['card'], 1, 1)
+        chartLayout.addWidget(self.trendChart['card'], 2, 0, 1, 2)
 
         layout.addLayout(chartLayout, 1)
 
@@ -91,6 +115,30 @@ class StatisticsPage(QWidget):
 
         valueLabel = SubtitleLabel(value)
         valueLabel.setStyleSheet(f"color: {color}; font-size: 32px; font-weight: bold;")
+
+        cardLayout.addWidget(titleLabel)
+        cardLayout.addWidget(valueLabel)
+
+        return card
+
+    def createWarningCard(self, title, value, color):
+        card = CardWidget()
+        card.setStyleSheet(f"""
+            CardWidget {{
+                background-color: {color}15;
+                border: 1px solid {color}40;
+                border-radius: 8px;
+            }}
+        """)
+        cardLayout = QVBoxLayout(card)
+        cardLayout.setContentsMargins(20, 15, 20, 15)
+        cardLayout.setSpacing(5)
+
+        titleLabel = BodyLabel(f"⚠ {title}")
+        titleLabel.setStyleSheet(f"color: {color}; font-size: 14px; font-weight: bold;")
+
+        valueLabel = SubtitleLabel(value)
+        valueLabel.setStyleSheet(f"color: {color}; font-size: 28px; font-weight: bold;")
 
         cardLayout.addWidget(titleLabel)
         cardLayout.addWidget(valueLabel)
@@ -120,8 +168,10 @@ class StatisticsPage(QWidget):
 
     def refresh(self):
         stats = self.dao.get_statistics()
+        warning_stats = self.warning_dao.get_statistics()
         self.updateStatCards(stats)
-        self.updateCharts(stats)
+        self.updateWarningCards(warning_stats)
+        self.updateCharts(stats, warning_stats)
 
     def updateStatCards(self, stats):
         total = stats["total"]
@@ -136,10 +186,16 @@ class StatisticsPage(QWidget):
         self.completedCard.findChild(SubtitleLabel).setText(str(completed))
         self.rateCard.findChild(SubtitleLabel).setText(f"{rate:.1f}%")
 
-    def updateCharts(self, stats):
+    def updateWarningCards(self, warning_stats):
+        self.overdueCard.findChild(SubtitleLabel).setText(str(warning_stats.get("超期未整改", 0)))
+        self.longTermCard.findChild(SubtitleLabel).setText(str(warning_stats.get("长期整改中", 0)))
+        self.noReviewCard.findChild(SubtitleLabel).setText(str(warning_stats.get("已完成但未复查", 0)))
+
+    def updateCharts(self, stats, warning_stats):
         self.plotProblemTypeChart(stats["by_problem_type"])
         self.plotSourceChart(stats["by_source"])
         self.plotStatusChart(stats)
+        self.plotWarningChart(warning_stats)
         self.plotTrendChart(stats["by_month"])
 
     def plotProblemTypeChart(self, data):
@@ -236,6 +292,53 @@ class StatisticsPage(QWidget):
         ax.set_title('整改状态分布')
         max_val = max(values) if values and max(values) > 0 else 10
         ax.set_ylim(0, max_val * 1.2)
+
+        total = sum(values) if values else 0
+        for i, bar in enumerate(bars):
+            height = bar.get_height()
+            if values and values[i] > 0 and total > 0:
+                pct = values[i] / total * 100
+                ax.text(bar.get_x() + bar.get_width()/2., height/2,
+                        f"{pct:.1f}%", ha='center', va='center',
+                        fontsize=10, color='white', fontweight='bold')
+
+        figure.tight_layout()
+        canvas.draw()
+
+    def plotWarningChart(self, warning_stats):
+        figure = self.warningChart['figure']
+        canvas = self.warningChart['canvas']
+        figure.clear()
+
+        data = []
+        for wt in WARNING_TYPES:
+            count = warning_stats.get(wt, 0)
+            if count > 0:
+                data.append((wt, count, WARNING_TYPE_COLORS.get(wt, "#333")))
+
+        if not data:
+            ax = figure.add_subplot(111)
+            ax.text(0.5, 0.5, "暂无预警", ha='center', va='center', fontsize=14, color='gray')
+            ax.axis('off')
+            canvas.draw()
+            return
+
+        labels = [d[0] for d in data]
+        values = [d[1] for d in data]
+        colors = [d[2] for d in data]
+
+        ax = figure.add_subplot(111)
+        bars = ax.bar(labels, values, color=colors, width=0.6)
+
+        for bar, value in zip(bars, values):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.05,
+                    str(value), ha='center', va='bottom', fontsize=11, fontweight='bold')
+
+        ax.set_ylabel('数量')
+        ax.set_title('预警类型分布')
+        max_val = max(values) if values else 10
+        ax.set_ylim(0, max_val * 1.3)
 
         total = sum(values) if values else 0
         for i, bar in enumerate(bars):

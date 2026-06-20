@@ -48,3 +48,18 @@ TOPIC_STATUSES = [
 
 SUMMARY_MIN_LENGTH = 12
 CONSECUTIVE_SAME_PROBLEM_THRESHOLD = 3
+
+OVERDUE_DAYS = 7
+LONG_TERM_RECTIFICATION_DAYS = 15
+
+WARNING_TYPES = [
+    "超期未整改",
+    "长期整改中",
+    "已完成但未复查"
+]
+
+WARNING_TYPE_COLORS = {
+    "超期未整改": "#e74c3c",
+    "长期整改中": "#f39c12",
+    "已完成但未复查": "#9b59b6"
+}

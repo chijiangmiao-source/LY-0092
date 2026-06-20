@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt, QSize, QRegularExpression
-from PySide6.QtGui import QRegularExpressionValidator
+from PySide6.QtGui import QRegularExpressionValidator, QColor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QHeaderView, QMessageBox, QLabel, QAbstractItemView
@@ -10,10 +10,11 @@ from qfluentwidgets import (
 )
 
 from app.dao.review_dao import ReviewDAO
+from app.dao.warning_dao import WarningDAO
 from app.models.models import BadReview
 from app.ui.dialogs.review_dialog import ReviewDialog
 from app.utils.signal_bus import SignalBus
-from app.utils.constants import PROBLEM_TYPES, REVIEW_SOURCES, RECTIFICATION_STATUSES
+from app.utils.constants import PROBLEM_TYPES, REVIEW_SOURCES, RECTIFICATION_STATUSES, WARNING_TYPES, WARNING_TYPE_COLORS
 
 
 class ReviewListPage(QWidget):
@@ -21,6 +22,7 @@ class ReviewListPage(QWidget):
         super().__init__(parent)
         self.setObjectName("reviewListPage")
         self.dao = ReviewDAO()
+        self.warning_dao = WarningDAO()
         self.signalBus = SignalBus()
         self.initUI()
         self.refresh()
@@ -87,6 +89,15 @@ class ReviewListPage(QWidget):
         self.roomFilter.textChanged.connect(self.onFilter)
         filterLayout.addWidget(self.roomFilter)
 
+        filterLayout.addWidget(QLabel("预警："))
+        self.warningFilter = ComboBox()
+        self.warningFilter.addItem("全部", "")
+        self.warningFilter.addItem("有预警", "has_warning")
+        for wt in WARNING_TYPES:
+            self.warningFilter.addItem(wt, wt)
+        self.warningFilter.currentIndexChanged.connect(self.onFilter)
+        filterLayout.addWidget(self.warningFilter)
+
         self.refreshBtn = PushButton("刷新")
         self.refreshBtn.setIcon(FIF.SYNC)
         self.refreshBtn.clicked.connect(self.refresh)
@@ -105,7 +116,7 @@ class ReviewListPage(QWidget):
         headers = [
             "记录编号", "入住日期", "房间号", "差评来源",
             "问题类型", "差评摘要", "责任归因", "整改状态",
-            "复查结果", "创建时间", "操作"
+            "复查结果", "预警", "创建时间", "操作"
         ]
         self.table.setColumnCount(len(headers))
         self.table.setHorizontalHeaderLabels(headers)
@@ -122,6 +133,7 @@ class ReviewListPage(QWidget):
         header.setSectionResizeMode(8, QHeaderView.Stretch)
         header.setSectionResizeMode(9, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(10, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(11, QHeaderView.ResizeToContents)
 
         layout.addWidget(self.table, 1)
 
@@ -141,6 +153,9 @@ class ReviewListPage(QWidget):
             filters["room_no"] = rn
         return filters
 
+    def getWarningFilter(self):
+        return self.warningFilter.currentData()
+
     def onSearch(self):
         self.loadData()
 
@@ -153,16 +168,31 @@ class ReviewListPage(QWidget):
         self.statusFilter.setCurrentIndex(0)
         self.sourceFilter.setCurrentIndex(0)
         self.roomFilter.clear()
+        self.warningFilter.setCurrentIndex(0)
         self.loadData()
 
     def loadData(self):
         keyword = self.searchEdit.text().strip()
         filters = self.getFilters()
+        warning_filter = self.getWarningFilter()
         reviews = self.dao.get_all(filters=filters, keyword=keyword)
 
+        if warning_filter:
+            review_ids = [r.id for r in reviews]
+            warnings_by_review = self.warning_dao.get_active_warnings_for_reviews(review_ids)
+
+            if warning_filter == "has_warning":
+                reviews = [r for r in reviews if r.id in warnings_by_review and warnings_by_review[r.id]]
+            else:
+                reviews = [r for r in reviews if r.id in warnings_by_review and
+                           any(w.warning_type == warning_filter for w in warnings_by_review[r.id])]
+
         self.table.setRowCount(0)
+        review_ids = [r.id for r in reviews]
+        warnings_by_review = self.warning_dao.get_active_warnings_for_reviews(review_ids)
+
         for review in reviews:
-            self.addTableRow(review)
+            self.addTableRow(review, warnings_by_review.get(review.id, []))
 
         InfoBar.success(
             title="加载成功",
@@ -174,7 +204,7 @@ class ReviewListPage(QWidget):
             parent=self
         )
 
-    def addTableRow(self, review: BadReview):
+    def addTableRow(self, review: BadReview, warnings=None):
         row = self.table.rowCount()
         self.table.insertRow(row)
 
@@ -196,7 +226,17 @@ class ReviewListPage(QWidget):
         self.table.setItem(row, 7, statusItem)
 
         self.table.setItem(row, 8, QTableWidgetItem(review.review_result))
-        self.table.setItem(row, 9, QTableWidgetItem(review.created_at[:16]))
+
+        if warnings:
+            warning_types = "、".join([w.warning_type for w in warnings])
+            warning_item = QTableWidgetItem(f"⚠ {warning_types}")
+            color = WARNING_TYPE_COLORS.get(warnings[0].warning_type, "#e74c3c")
+            warning_item.setForeground(QColor(color))
+            self.table.setItem(row, 9, warning_item)
+        else:
+            self.table.setItem(row, 9, QTableWidgetItem(""))
+
+        self.table.setItem(row, 10, QTableWidgetItem(review.created_at[:16]))
 
         btnWidget = QWidget()
         btnLayout = QHBoxLayout(btnWidget)
@@ -213,7 +253,7 @@ class ReviewListPage(QWidget):
         deleteBtn.clicked.connect(lambda _=False, r=review: self.deleteReview(r))
         btnLayout.addWidget(deleteBtn)
 
-        self.table.setCellWidget(row, 10, btnWidget)
+        self.table.setCellWidget(row, 11, btnWidget)
 
     def addReview(self):
         dialog = ReviewDialog(parent=self)

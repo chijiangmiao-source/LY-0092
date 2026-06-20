@@ -9,12 +9,14 @@ from app.utils.constants import (
     CONSECUTIVE_SAME_PROBLEM_THRESHOLD
 )
 from app.dao.topic_dao import TopicDAO
+from app.dao.warning_dao import WarningDAO
 
 
 class ReviewDAO:
     def __init__(self):
         self.db = DatabaseManager()
         self.topic_dao = TopicDAO()
+        self.warning_dao = WarningDAO()
 
     def generate_record_no(self) -> str:
         today = datetime.now().strftime("%Y%m%d")
@@ -128,6 +130,7 @@ class ReviewDAO:
             ))
             review.id = cursor.lastrowid
             self._create_special_topic_if_needed(review)
+            self.warning_dao.sync_warnings_for_review(review)
             return review, validation
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint failed" in str(e):
@@ -155,10 +158,12 @@ class ReviewDAO:
         ))
 
         self._create_special_topic_if_needed(review)
+        self.warning_dao.sync_warnings_for_review(review)
         return review, validation
 
     def delete(self, review_id: int) -> bool:
         self.db.execute_query("DELETE FROM topic_reviews WHERE review_id = ?", (review_id,))
+        self.warning_dao.delete_by_review_id(review_id)
         self.db.execute_query("DELETE FROM bad_reviews WHERE id = ?", (review_id,))
         return True
 

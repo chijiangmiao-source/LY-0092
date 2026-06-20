@@ -71,6 +71,33 @@ class SpecialTopic:
 
 
 @dataclass
+class Warning:
+    id: Optional[int] = None
+    review_id: int = 0
+    warning_type: str = ""
+    warning_reason: str = ""
+    detected_at: str = ""
+    dismissed: int = 0
+    dismissed_at: Optional[str] = None
+    dismissed_reason: str = ""
+
+    @staticmethod
+    def from_row(row):
+        if not row:
+            return None
+        return Warning(
+            id=row["id"],
+            review_id=row["review_id"],
+            warning_type=row["warning_type"],
+            warning_reason=row["warning_reason"],
+            detected_at=row["detected_at"],
+            dismissed=row["dismissed"],
+            dismissed_at=row["dismissed_at"],
+            dismissed_reason=row["dismissed_reason"] or ""
+        )
+
+
+@dataclass
 class ValidationResult:
     is_valid: bool
     errors: List[str]

@@ -20,6 +20,7 @@ class DatabaseManager:
 
         self._conn = sqlite3.connect(str(db_path))
         self._conn.row_factory = sqlite3.Row
+        self._conn.execute("PRAGMA foreign_keys = ON")
         self._create_tables()
 
     def _create_tables(self):
@@ -65,6 +66,21 @@ class DatabaseManager:
                 FOREIGN KEY(topic_id) REFERENCES special_topics(id),
                 FOREIGN KEY(review_id) REFERENCES bad_reviews(id),
                 UNIQUE(topic_id, review_id)
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS review_warnings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                review_id INTEGER NOT NULL,
+                warning_type TEXT NOT NULL,
+                warning_reason TEXT NOT NULL,
+                detected_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                dismissed INTEGER DEFAULT 0,
+                dismissed_at TEXT,
+                dismissed_reason TEXT,
+                FOREIGN KEY(review_id) REFERENCES bad_reviews(id) ON DELETE CASCADE,
+                UNIQUE(review_id, warning_type)
             )
         ''')
 
