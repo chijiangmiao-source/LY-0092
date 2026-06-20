@@ -194,16 +194,6 @@ class ReviewListPage(QWidget):
         for review in reviews:
             self.addTableRow(review, warnings_by_review.get(review.id, []))
 
-        InfoBar.success(
-            title="加载成功",
-            content=f"共 {len(reviews)} 条记录",
-            orient=Qt.Horizontal,
-            isClosable=True,
-            position=InfoBarPosition.TOP,
-            duration=2000,
-            parent=self
-        )
-
     def addTableRow(self, review: BadReview, warnings=None):
         row = self.table.rowCount()
         self.table.insertRow(row)
@@ -228,11 +218,15 @@ class ReviewListPage(QWidget):
         self.table.setItem(row, 8, QTableWidgetItem(review.review_result))
 
         if warnings:
-            warning_types = "、".join([w.warning_type for w in warnings])
-            warning_item = QTableWidgetItem(f"⚠ {warning_types}")
-            color = WARNING_TYPE_COLORS.get(warnings[0].warning_type, "#e74c3c")
-            warning_item.setForeground(QColor(color))
-            self.table.setItem(row, 9, warning_item)
+            warning_html_parts = []
+            for w in warnings:
+                color = WARNING_TYPE_COLORS.get(w.warning_type, "#333")
+                warning_html_parts.append(f'<span style="color:{color};font-weight:bold;">⚠ {w.warning_type}</span>')
+            warning_html = "&nbsp;".join(warning_html_parts)
+            warning_label = QLabel(warning_html)
+            warning_label.setTextFormat(Qt.RichText)
+            warning_label.setContentsMargins(5, 2, 5, 2)
+            self.table.setCellWidget(row, 9, warning_label)
         else:
             self.table.setItem(row, 9, QTableWidgetItem(""))
 

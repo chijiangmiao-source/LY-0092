@@ -362,16 +362,19 @@ class RectificationPage(QWidget):
 
         warnings = self.warning_dao.get_by_review_id(review.id)
         if warnings:
-            warning_types = ", ".join([w.warning_type for w in warnings])
-            colors = [WARNING_TYPE_COLORS.get(w.warning_type, "#333") for w in warnings]
-            color = colors[0] if colors else "#333"
-            self.warningDetail.setText(f"⚠ {warning_types}")
-            self.warningDetail.setStyleSheet(f"color: {color}; font-weight: bold;")
+            warning_html_parts = []
+            for w in warnings:
+                color = WARNING_TYPE_COLORS.get(w.warning_type, "#333")
+                warning_html_parts.append(f'<span style="color:{color};font-weight:bold;">⚠ {w.warning_type}</span>')
+            warning_html = "&nbsp;".join(warning_html_parts)
+            self.warningDetail.setText(warning_html)
+            self.warningDetail.setTextFormat(Qt.RichText)
             self.viewWarningBtn.setEnabled(True)
             self.dismissWarningBtn.setEnabled(True)
             self.current_warnings = warnings
         else:
             self.warningDetail.setText("无预警")
+            self.warningDetail.setTextFormat(Qt.PlainText)
             self.warningDetail.setStyleSheet("color: #666;")
             self.viewWarningBtn.setEnabled(False)
             self.dismissWarningBtn.setEnabled(False)
@@ -384,6 +387,7 @@ class RectificationPage(QWidget):
         self.responsibilityDetail.setText("-")
         self.measureDetail.clear()
         self.warningDetail.setText("无预警")
+        self.warningDetail.setTextFormat(Qt.PlainText)
         self.warningDetail.setStyleSheet("color: #666;")
         self.viewWarningBtn.setEnabled(False)
         self.dismissWarningBtn.setEnabled(False)
@@ -566,10 +570,14 @@ class RectificationPage(QWidget):
 
             warnings = warnings_by_review.get(review.id, [])
             if warnings:
-                warning_types = "、".join([w.warning_type for w in warnings])
-                warning_item = QTableWidgetItem(f"⚠ {warning_types}")
-                color = WARNING_TYPE_COLORS.get(warnings[0].warning_type, "#e74c3c")
-                warning_item.setForeground(QColor(color))
-                table.setItem(row, 6, warning_item)
+                warning_html_parts = []
+                for w in warnings:
+                    color = WARNING_TYPE_COLORS.get(w.warning_type, "#333")
+                    warning_html_parts.append(f'<span style="color:{color};font-weight:bold;">⚠ {w.warning_type}</span>')
+                warning_html = "&nbsp;".join(warning_html_parts)
+                warning_label = QLabel(warning_html)
+                warning_label.setTextFormat(Qt.RichText)
+                warning_label.setContentsMargins(5, 2, 5, 2)
+                table.setCellWidget(row, 6, warning_label)
             else:
                 table.setItem(row, 6, QTableWidgetItem(""))

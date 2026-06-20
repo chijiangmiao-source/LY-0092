@@ -74,15 +74,14 @@ class WarningDAO:
         for warning in expected_warnings:
             if warning.warning_type in existing_by_type:
                 existing_w = existing_by_type[warning.warning_type]
-                if existing_w.dismissed == 0 and existing_w.warning_reason == warning.warning_reason:
+                if existing_w.dismissed == 1:
+                    continue
+                if existing_w.warning_reason == warning.warning_reason:
                     continue
                 self.db.execute_query('''
                     UPDATE review_warnings SET
                         warning_reason = ?,
-                        detected_at = ?,
-                        dismissed = 0,
-                        dismissed_at = NULL,
-                        dismissed_reason = ''
+                        detected_at = ?
                     WHERE review_id = ? AND warning_type = ?
                 ''', (
                     warning.warning_reason,
