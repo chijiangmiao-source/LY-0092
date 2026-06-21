@@ -11,6 +11,7 @@ from app.ui.pages.rectification_page import RectificationPage
 from app.ui.pages.topic_page import TopicPage
 from app.ui.pages.statistics_page import StatisticsPage
 from app.ui.pages.knowledge_page import KnowledgePage
+from app.ui.pages.review_analysis_page import ReviewAnalysisPage
 
 
 def create_app_icon():
@@ -60,10 +61,12 @@ class MainWindow(FluentWindow):
         self.topicPage = TopicPage(self)
         self.statisticsPage = StatisticsPage(self)
         self.knowledgePage = KnowledgePage(self)
+        self.reviewAnalysisPage = ReviewAnalysisPage(self)
 
         self.addSubInterface(self.reviewListPage, FIF.DOCUMENT, '差评记录')
         self.addSubInterface(self.rectificationPage, FIF.BOOK_SHELF, '整改任务')
         self.addSubInterface(self.topicPage, FIF.HISTORY, '重点整改专题')
+        self.addSubInterface(self.reviewAnalysisPage, FIF.EXPRESSIVE_INPUT_ENTRY, '整改复盘中心')
         self.addSubInterface(self.knowledgePage, FIF.BOOK_SHELF, '整改知识库')
         self.addSubInterface(self.statisticsPage, FIF.VIEW, '统计分析')
 

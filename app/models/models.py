@@ -129,6 +129,35 @@ class RectificationKnowledge:
 
 
 @dataclass
+class RectificationReview:
+    id: Optional[int] = None
+    review_id: int = 0
+    record_no: str = ""
+    review_conclusion: str = ""
+    experience_summary: str = ""
+    prevention_measures: str = ""
+    recurrence_risk: str = "低"
+    reviewed_at: str = ""
+    reviewer: str = ""
+
+    @staticmethod
+    def from_row(row):
+        if not row:
+            return None
+        return RectificationReview(
+            id=row["id"],
+            review_id=row["review_id"],
+            record_no=row["record_no"],
+            review_conclusion=row["review_conclusion"],
+            experience_summary=row["experience_summary"],
+            prevention_measures=row["prevention_measures"],
+            recurrence_risk=row["recurrence_risk"],
+            reviewed_at=row["reviewed_at"],
+            reviewer=row["reviewer"]
+        )
+
+
+@dataclass
 class ValidationResult:
     is_valid: bool
     errors: List[str]

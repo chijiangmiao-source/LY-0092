@@ -99,6 +99,22 @@ class DatabaseManager:
             )
         ''')
 
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS rectification_reviews (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                review_id INTEGER NOT NULL,
+                record_no TEXT NOT NULL,
+                review_conclusion TEXT NOT NULL,
+                experience_summary TEXT,
+                prevention_measures TEXT,
+                recurrence_risk TEXT NOT NULL DEFAULT '低',
+                reviewed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                reviewer TEXT,
+                FOREIGN KEY(review_id) REFERENCES bad_reviews(id) ON DELETE CASCADE,
+                UNIQUE(review_id)
+            )
+        ''')
+
         self._conn.commit()
 
     def get_connection(self):
