@@ -18,6 +18,7 @@ from app.dao.review_dao import ReviewDAO
 from app.dao.warning_dao import WarningDAO
 from app.utils.signal_bus import SignalBus
 from app.utils.constants import WARNING_TYPES, WARNING_TYPE_COLORS
+from app.utils.query_builder import safe_rate
 
 plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS']
 plt.rcParams['axes.unicode_minus'] = False
@@ -178,7 +179,7 @@ class StatisticsPage(QWidget):
         pending = stats["pending"]
         in_progress = stats["in_progress"]
         completed = stats["completed"]
-        rate = (completed / total * 100) if total > 0 else 0
+        rate = safe_rate(completed, total)
 
         self.totalCard.findChild(SubtitleLabel).setText(str(total))
         self.pendingCard.findChild(SubtitleLabel).setText(str(pending))

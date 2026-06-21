@@ -14,7 +14,8 @@ from app.dao.warning_dao import WarningDAO
 from app.models.models import BadReview
 from app.ui.dialogs.review_dialog import ReviewDialog
 from app.utils.signal_bus import SignalBus
-from app.utils.constants import PROBLEM_TYPES, REVIEW_SOURCES, RECTIFICATION_STATUSES, WARNING_TYPES, WARNING_TYPE_COLORS
+from app.utils.constants import PROBLEM_TYPES, REVIEW_SOURCES, RECTIFICATION_STATUSES, WARNING_TYPES
+from app.utils.query_builder import format_warning_html
 
 
 class ReviewListPage(QWidget):
@@ -218,12 +219,7 @@ class ReviewListPage(QWidget):
         self.table.setItem(row, 8, QTableWidgetItem(review.review_result))
 
         if warnings:
-            warning_html_parts = []
-            for w in warnings:
-                color = WARNING_TYPE_COLORS.get(w.warning_type, "#333")
-                warning_html_parts.append(f'<span style="color:{color};font-weight:bold;">⚠ {w.warning_type}</span>')
-            warning_html = "&nbsp;".join(warning_html_parts)
-            warning_label = QLabel(warning_html)
+            warning_label = QLabel(format_warning_html(warnings))
             warning_label.setTextFormat(Qt.RichText)
             warning_label.setContentsMargins(5, 2, 5, 2)
             self.table.setCellWidget(row, 9, warning_label)

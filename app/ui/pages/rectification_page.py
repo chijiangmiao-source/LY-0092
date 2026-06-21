@@ -19,6 +19,7 @@ from app.models.models import BadReview, Warning
 from app.ui.dialogs.review_dialog import ReviewDialog
 from app.utils.signal_bus import SignalBus
 from app.utils.constants import WARNING_TYPES, WARNING_TYPE_COLORS
+from app.utils.query_builder import format_warning_html
 
 
 class WarningDetailDialog(QDialog):
@@ -362,12 +363,7 @@ class RectificationPage(QWidget):
 
         warnings = self.warning_dao.get_by_review_id(review.id)
         if warnings:
-            warning_html_parts = []
-            for w in warnings:
-                color = WARNING_TYPE_COLORS.get(w.warning_type, "#333")
-                warning_html_parts.append(f'<span style="color:{color};font-weight:bold;">⚠ {w.warning_type}</span>')
-            warning_html = "&nbsp;".join(warning_html_parts)
-            self.warningDetail.setText(warning_html)
+            self.warningDetail.setText(format_warning_html(warnings))
             self.warningDetail.setTextFormat(Qt.RichText)
             self.viewWarningBtn.setEnabled(True)
             self.dismissWarningBtn.setEnabled(True)
@@ -570,12 +566,7 @@ class RectificationPage(QWidget):
 
             warnings = warnings_by_review.get(review.id, [])
             if warnings:
-                warning_html_parts = []
-                for w in warnings:
-                    color = WARNING_TYPE_COLORS.get(w.warning_type, "#333")
-                    warning_html_parts.append(f'<span style="color:{color};font-weight:bold;">⚠ {w.warning_type}</span>')
-                warning_html = "&nbsp;".join(warning_html_parts)
-                warning_label = QLabel(warning_html)
+                warning_label = QLabel(format_warning_html(warnings))
                 warning_label.setTextFormat(Qt.RichText)
                 warning_label.setContentsMargins(5, 2, 5, 2)
                 table.setCellWidget(row, 6, warning_label)

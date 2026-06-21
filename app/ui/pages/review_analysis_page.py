@@ -20,6 +20,7 @@ from app.utils.constants import (
     PROBLEM_TYPES, ROOM_TYPES, REVIEW_SOURCES,
     RESPONSIBILITY_TYPES, RECURRENCE_LEVELS
 )
+from app.utils.query_builder import ReviewFilterParams
 
 
 class ReviewAnalysisPage(QWidget):
@@ -629,13 +630,14 @@ class ReviewAnalysisPage(QWidget):
         return page
 
     def getFilters(self):
-        start_date = self.startDateEdit.date().toString("yyyy-MM-dd")
-        end_date = self.endDateEdit.date().toString("yyyy-MM-dd")
-        problem_type = self.problemTypeFilter.currentData() or ""
-        room_type = self.roomTypeFilter.currentData() or ""
-        source = self.sourceFilter.currentData() or ""
-        responsibility = self.responsibilityFilter.currentData() or ""
-        return start_date, end_date, problem_type, room_type, source, responsibility
+        return ReviewFilterParams(
+            start_date=self.startDateEdit.date().toString("yyyy-MM-dd"),
+            end_date=self.endDateEdit.date().toString("yyyy-MM-dd"),
+            problem_type=self.problemTypeFilter.currentData() or "",
+            room_type=self.roomTypeFilter.currentData() or "",
+            source=self.sourceFilter.currentData() or "",
+            responsibility=self.responsibilityFilter.currentData() or "",
+        )
 
     def onFilter(self):
         self.loadData()
@@ -657,21 +659,25 @@ class ReviewAnalysisPage(QWidget):
         self.loadData()
 
     def loadData(self):
-        start_date, end_date, problem_type, room_type, source, responsibility = self.getFilters()
+        fp = self.getFilters()
 
         comparison = self.dao.get_comparison_analysis(
-            start_date, end_date, problem_type, room_type, source, responsibility
+            fp.start_date, fp.end_date, fp.problem_type,
+            fp.room_type, fp.source, fp.responsibility
         )
         recurrence_stats = self.dao.get_recurrence_stats(
-            start_date, end_date, problem_type, room_type, source, responsibility
+            fp.start_date, fp.end_date, fp.problem_type,
+            fp.room_type, fp.source, fp.responsibility
         )
         duration_stats = self.dao.get_duration_stats(
-            start_date, end_date, problem_type, room_type, source, responsibility
+            fp.start_date, fp.end_date, fp.problem_type,
+            fp.room_type, fp.source, fp.responsibility
         )
         pass_rate_stats = self.dao.get_pass_rate_stats(
-            start_date, end_date, problem_type, room_type, source, responsibility
+            fp.start_date, fp.end_date, fp.problem_type,
+            fp.room_type, fp.source, fp.responsibility
         )
-        high_risk = self.dao.get_high_risk_problems(start_date, end_date)
+        high_risk = self.dao.get_high_risk_problems(fp.start_date, fp.end_date)
 
         self.updateSummaryCards(comparison, recurrence_stats)
         self.updateComparisonPanels(pass_rate_stats)
