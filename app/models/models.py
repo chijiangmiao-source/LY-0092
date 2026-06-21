@@ -98,6 +98,37 @@ class Warning:
 
 
 @dataclass
+class RectificationKnowledge:
+    id: Optional[int] = None
+    problem_type: str = ""
+    typical_scenario: str = ""
+    cause_analysis: str = ""
+    recommended_measures: str = ""
+    review_points: str = ""
+    applicable_rooms: str = ""
+    use_count: int = 0
+    created_at: str = ""
+    updated_at: str = ""
+
+    @staticmethod
+    def from_row(row):
+        if not row:
+            return None
+        return RectificationKnowledge(
+            id=row["id"],
+            problem_type=row["problem_type"],
+            typical_scenario=row["typical_scenario"],
+            cause_analysis=row["cause_analysis"],
+            recommended_measures=row["recommended_measures"],
+            review_points=row["review_points"],
+            applicable_rooms=row["applicable_rooms"],
+            use_count=row["use_count"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"]
+        )
+
+
+@dataclass
 class ValidationResult:
     is_valid: bool
     errors: List[str]
