@@ -22,7 +22,7 @@ class ReviewDialog(QDialog):
         self.review = review or BadReview()
         self.is_edit = review is not None
         self.knowledge_dao = KnowledgeDAO()
-        self.used_knowledge_ids = []
+        self.applied_knowledge_ids = []
         self.initUI()
         if self.is_edit:
             self.loadData()
@@ -199,7 +199,11 @@ class ReviewDialog(QDialog):
             self.knowledgeLayout.addWidget(card)
 
     def createKnowledgeCard(self, knowledge: RectificationKnowledge):
+        is_applied = knowledge.id in self.applied_knowledge_ids
         card = CardWidget()
+        if is_applied:
+            card.setStyleSheet("CardWidget { border: 2px solid #107c10; border-radius: 8px; }")
+
         cardLayout = QVBoxLayout(card)
         cardLayout.setContentsMargins(12, 10, 12, 10)
         cardLayout.setSpacing(6)
@@ -217,10 +221,17 @@ class ReviewDialog(QDialog):
                                      "background: #e8f0fe; border-radius: 10px;")
         headerLayout.addWidget(useCountLabel)
 
-        applyBtn = PushButton("应用")
-        applyBtn.setFixedSize(60, 26)
-        applyBtn.clicked.connect(lambda _=False, k=knowledge: self.applyKnowledge(k))
-        headerLayout.addWidget(applyBtn)
+        if is_applied:
+            appliedBtn = PushButton("已应用")
+            appliedBtn.setFixedSize(70, 26)
+            appliedBtn.setEnabled(False)
+            appliedBtn.setStyleSheet("PushButton:disabled { background-color: #107c10; color: white; border: none; }")
+            headerLayout.addWidget(appliedBtn)
+        else:
+            applyBtn = PushButton("应用")
+            applyBtn.setFixedSize(60, 26)
+            applyBtn.clicked.connect(lambda _=False, k=knowledge: self.applyKnowledge(k))
+            headerLayout.addWidget(applyBtn)
 
         cardLayout.addLayout(headerLayout)
 
@@ -265,9 +276,8 @@ class ReviewDialog(QDialog):
             new_text = knowledge.recommended_measures
         self.measureEdit.setPlainText(new_text)
 
-        if knowledge.id not in self.used_knowledge_ids:
-            self.knowledge_dao.increment_use_count(knowledge.id)
-            self.used_knowledge_ids.append(knowledge.id)
+        if knowledge.id not in self.applied_knowledge_ids:
+            self.applied_knowledge_ids.append(knowledge.id)
             self.loadKnowledgeRecommendations()
 
         if knowledge.review_points and not self.reviewResultEdit.toPlainText().strip():
@@ -337,5 +347,8 @@ class ReviewDialog(QDialog):
         self.review.rectification_measure = self.measureEdit.toPlainText().strip()
         self.review.rectification_status = self.statusCombo.currentText()
         self.review.review_result = self.reviewResultEdit.toPlainText().strip()
+
+        for kid in self.applied_knowledge_ids:
+            self.knowledge_dao.increment_use_count(kid)
 
         super().accept()
